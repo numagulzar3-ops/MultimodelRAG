@@ -127,6 +127,10 @@ async def upload_document(
 
     except Exception as error:
 
+        print("ERROR IN /upload:")
+        print(type(error).__name__)
+        print(str(error))
+
         if file_path.exists():
 
             file_path.unlink()
@@ -172,6 +176,16 @@ def ask_question(
         }
 
     except Exception as error:
+
+        # ----------------------------------------------------
+        # IMPORTANT DEBUGGING LOG
+        # ----------------------------------------------------
+
+        print("\n========================================")
+        print("ERROR IN /ask:")
+        print("ERROR TYPE:", type(error).__name__)
+        print("ERROR MESSAGE:", str(error))
+        print("========================================\n")
 
         raise HTTPException(
             status_code=500,
