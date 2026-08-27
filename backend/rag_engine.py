@@ -1,25 +1,19 @@
 import os
 
+import faiss
+import numpy as np
+
 from sentence_transformers import SentenceTransformer
+
 from unstructured.partition.docx import partition_docx
 from unstructured.partition.pdf import partition_pdf
 from unstructured.chunking.title import chunk_by_title
-
-import faiss
-import numpy as np
 
 from google import genai
 
 
 # ============================================================
-# 1. EMBEDDING MODEL
-# ============================================================
-
-model = SentenceTransformer("all-MiniLM-L6-v2")
-
-
-# ============================================================
-# 2. GEMINI CLIENT
+# 1. GEMINI CLIENT
 # ============================================================
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -32,6 +26,30 @@ if not GEMINI_API_KEY:
 client = genai.Client(
     api_key=GEMINI_API_KEY
 )
+
+
+# ============================================================
+# 2. EMBEDDING MODEL
+# ============================================================
+
+model = None
+
+
+def get_embedding_model():
+
+    global model
+
+    if model is None:
+
+        print("\nLoading embedding model...")
+
+        model = SentenceTransformer(
+            "all-MiniLM-L6-v2"
+        )
+
+        print("Embedding model loaded.")
+
+    return model
 
 
 # ============================================================
@@ -107,10 +125,16 @@ def process_document(file_path):
         )
 
     # --------------------------------------------------------
+    # Load embedding model ONLY when needed
+    # --------------------------------------------------------
+
+    embedding_model = get_embedding_model()
+
+    # --------------------------------------------------------
     # Create embeddings
     # --------------------------------------------------------
 
-    embeddings = model.encode(
+    embeddings = embedding_model.encode(
         texts
     )
 
@@ -167,6 +191,12 @@ def answer_question(query):
             "sources": []
         }
 
+    # --------------------------------------------------------
+    # Get embedding model
+    # --------------------------------------------------------
+
+    embedding_model = get_embedding_model()
+
     # ========================================================
     # CREATE HISTORY TEXT
     # ========================================================
@@ -210,10 +240,6 @@ Rules:
 Rewritten search query:
 """
 
-    # --------------------------------------------------------
-    # Gemini query rewriting
-    # --------------------------------------------------------
-
     rewrite_response = client.models.generate_content(
         model="gemini-3.6-flash",
         contents=rewrite_prompt
@@ -233,7 +259,7 @@ Rewritten search query:
     # EMBED SEARCH QUERY
     # ========================================================
 
-    query_embedding = model.encode(
+    query_embedding = embedding_model.encode(
         [search_query]
     )
 
