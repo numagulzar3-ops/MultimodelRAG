@@ -14,4 +14,5 @@ unstructured==0.18.32
 python-docx==1.2.0
 pypdf==6.16.2
 
-ollama==0.6.2
+
+google-genai==2.20.0

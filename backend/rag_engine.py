@@ -1,19 +1,16 @@
+import os
+
 from sentence_transformers import SentenceTransformer
 from unstructured.partition.docx import partition_docx
 from unstructured.partition.pdf import partition_pdf
 from unstructured.chunking.title import chunk_by_title
+
 import faiss
 import numpy as np
-import ollama
-import os
-from dotenv import load_dotenv
 
-load_dotenv()
+from google import genai
 
-OLLAMA_MODEL = os.getenv(
-    "OLLAMA_MODEL",
-    "llama3.2"
-)
+
 # ============================================================
 # 1. EMBEDDING MODEL
 # ============================================================
@@ -22,7 +19,23 @@ model = SentenceTransformer("all-MiniLM-L6-v2")
 
 
 # ============================================================
-# 2. GLOBAL RAG STATE
+# 2. GEMINI CLIENT
+# ============================================================
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+if not GEMINI_API_KEY:
+    raise RuntimeError(
+        "GEMINI_API_KEY environment variable is not set."
+    )
+
+client = genai.Client(
+    api_key=GEMINI_API_KEY
+)
+
+
+# ============================================================
+# 3. GLOBAL RAG STATE
 # ============================================================
 
 texts = []
@@ -31,7 +44,7 @@ chat_history = []
 
 
 # ============================================================
-# 3. PROCESS DOCUMENT
+# 4. PROCESS DOCUMENT
 # ============================================================
 
 def process_document(file_path):
@@ -65,7 +78,6 @@ def process_document(file_path):
             "Unsupported file type. Please upload a PDF or DOCX file."
         )
 
-
     # --------------------------------------------------------
     # Create chunks
     # --------------------------------------------------------
@@ -83,25 +95,33 @@ def process_document(file_path):
         if chunk.text
     ]
 
-    print("Total chunks:", len(texts))
+    print(
+        "Total chunks:",
+        len(texts)
+    )
 
+    if not texts:
+
+        raise ValueError(
+            "No readable text was found in the document."
+        )
 
     # --------------------------------------------------------
     # Create embeddings
     # --------------------------------------------------------
 
-    embeddings = model.encode(texts)
+    embeddings = model.encode(
+        texts
+    )
 
     embeddings = np.array(
         embeddings
     ).astype("float32")
 
-
     print(
         "Embedding shape:",
         embeddings.shape
     )
-
 
     # --------------------------------------------------------
     # Create FAISS index
@@ -113,21 +133,20 @@ def process_document(file_path):
         dimension
     )
 
-    index.add(embeddings)
-
+    index.add(
+        embeddings
+    )
 
     print(
         "Vectors in FAISS:",
         index.ntotal
     )
 
-
     # --------------------------------------------------------
-    # Reset conversation when new document is uploaded
+    # Reset conversation
     # --------------------------------------------------------
 
     chat_history = []
-
 
     return {
         "chunks": len(texts),
@@ -136,15 +155,17 @@ def process_document(file_path):
 
 
 # ============================================================
-# 4. ANSWER QUESTION
+# 5. ANSWER QUESTION
 # ============================================================
 
 def answer_question(query):
 
     if index is None or not texts:
 
-        return "Please upload a document before asking a question."
-
+        return {
+            "answer": "Please upload a document before asking a question.",
+            "sources": []
+        }
 
     # ========================================================
     # CREATE HISTORY TEXT
@@ -158,7 +179,6 @@ def answer_question(query):
 User: {user_message}
 Assistant: {assistant_message}
 """
-
 
     # ========================================================
     # QUERY REWRITING
@@ -190,32 +210,24 @@ Rules:
 Rewritten search query:
 """
 
+    # --------------------------------------------------------
+    # Gemini query rewriting
+    # --------------------------------------------------------
 
-    rewrite_response = ollama.chat(
-        model=OLLAMA_MODEL,
-        messages=[
-            {
-                "role": "user",
-                "content": rewrite_prompt
-            }
-        ]
+    rewrite_response = client.models.generate_content(
+        model="gemini-3.6-flash",
+        contents=rewrite_prompt
     )
-    print("\nDEBUG rewrite_response:")
-    print(rewrite_response)
-    print("DEBUG type:", type(rewrite_response))
-
 
     search_query = (
-        rewrite_response["message"]["content"]
+        rewrite_response.text
         .strip()
     )
-
 
     print(
         "\nSearch query:",
         search_query
     )
-
 
     # ========================================================
     # EMBED SEARCH QUERY
@@ -229,7 +241,6 @@ Rewritten search query:
         query_embedding
     ).astype("float32")
 
-
     # ========================================================
     # FAISS SEARCH
     # ========================================================
@@ -238,7 +249,6 @@ Rewritten search query:
         query_embedding,
         min(3, index.ntotal)
     )
-
 
     # ========================================================
     # RETRIEVE CHUNKS
@@ -254,11 +264,9 @@ Rewritten search query:
                 texts[idx]
             )
 
-
     context = "\n\n".join(
         retrieved_chunks
     )
-
 
     # ========================================================
     # FINAL PROMPT
@@ -294,28 +302,16 @@ Current user question:
 Answer:
 """
 
-
     # ========================================================
-    # SEND TO LLAMA
+    # GEMINI FINAL ANSWER
     # ========================================================
 
-    response = ollama.chat(
-        model=OLLAMA_MODEL,
-        messages=[
-            {
-                "role": "user",
-                "content": final_prompt
-            }
-        ]
+    response = client.models.generate_content(
+        model="gemini-3.6-flash",
+        contents=final_prompt
     )
 
-
-    # ========================================================
-    # GET ANSWER
-    # ========================================================
-
-    answer = response["message"]["content"]
-
+    answer = response.text.strip()
 
     # ========================================================
     # SAVE CONVERSATION
@@ -325,8 +321,13 @@ Answer:
         (query, answer)
     )
 
+    # ========================================================
+    # RETURN ANSWER + SOURCES
+    # ========================================================
+
     return {
         "answer": answer,
+
         "sources": [
             {
                 "chunk": int(idx) + 1,
