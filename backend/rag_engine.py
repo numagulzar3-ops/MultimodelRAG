@@ -5,8 +5,15 @@ from unstructured.chunking.title import chunk_by_title
 import faiss
 import numpy as np
 import ollama
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 
+OLLAMA_MODEL = os.getenv(
+    "OLLAMA_MODEL",
+    "llama3.2"
+)
 # ============================================================
 # 1. EMBEDDING MODEL
 # ============================================================
@@ -185,7 +192,7 @@ Rewritten search query:
 
 
     rewrite_response = ollama.chat(
-        model="llama3.2",
+        model=OLLAMA_MODEL,
         messages=[
             {
                 "role": "user",
@@ -293,7 +300,7 @@ Answer:
     # ========================================================
 
     response = ollama.chat(
-        model="llama3.2",
+        model=OLLAMA_MODEL,
         messages=[
             {
                 "role": "user",
