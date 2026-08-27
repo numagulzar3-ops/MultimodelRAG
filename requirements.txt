@@ -1,0 +1,17 @@
+fastapi==0.141.1
+uvicorn==0.52.4
+python-multipart==0.0.32
+python-dotenv==1.2.3
+
+numpy==2.5.2
+faiss-cpu==1.15.0
+
+sentence-transformers==6.0.0
+torch==2.13.0
+transformers==5.16.1
+
+unstructured==0.18.32
+python-docx==1.2.0
+pypdf==6.16.2
+
+ollama==0.6.2
