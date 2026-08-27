@@ -1,5 +1,8 @@
+
 import { useRef, useState } from "react";
 import "./App.css";
+
+const API_URL = "https://multimodel-rag-api.onrender.com";
 
 function App() {
   const fileInputRef = useRef(null);
@@ -26,6 +29,7 @@ function App() {
 
     if (![".pdf", ".docx"].includes(extension)) {
       alert("Please upload a PDF or DOCX file.");
+      event.target.value = "";
       return;
     }
 
@@ -36,7 +40,7 @@ function App() {
 
     try {
       const response = await fetch(
-        "http://localhost:8000/upload",
+        `${API_URL}/upload`,
         {
           method: "POST",
           body: formData,
@@ -59,7 +63,7 @@ function App() {
       setMessages([]);
 
     } catch (error) {
-      console.error(error);
+      console.error("Upload error:", error);
 
       alert(
         error.message ||
@@ -78,7 +82,6 @@ function App() {
   // ==========================================================
 
   const askQuestion = async () => {
-
     if (!question.trim() || loading || !document) {
       return;
     }
@@ -97,9 +100,8 @@ function App() {
     setLoading(true);
 
     try {
-
       const response = await fetch(
-        "http://localhost:8000/ask",
+        `${API_URL}/ask`,
         {
           method: "POST",
 
@@ -131,8 +133,7 @@ function App() {
       ]);
 
     } catch (error) {
-
-      console.error(error);
+      console.error("Question error:", error);
 
       setMessages((prev) => [
         ...prev,
@@ -154,7 +155,6 @@ function App() {
   // ==========================================================
 
   const handleKeyDown = (event) => {
-
     if (
       event.key === "Enter" &&
       !event.shiftKey
@@ -162,7 +162,6 @@ function App() {
       event.preventDefault();
       askQuestion();
     }
-
   };
 
 
@@ -171,7 +170,7 @@ function App() {
   // ==========================================================
 
   const openFileSelector = () => {
-    fileInputRef.current.click();
+    fileInputRef.current?.click();
   };
 
 
@@ -180,12 +179,10 @@ function App() {
   // ==========================================================
 
   const SourceCard = ({ source }) => {
-
     const [expanded, setExpanded] =
       useState(false);
 
     return (
-
       <div className="source-card">
 
         <button
@@ -215,28 +212,19 @@ function App() {
 
           </div>
 
-
           <div className="source-arrow">
-
             {expanded ? "⌃" : "⌄"}
-
           </div>
 
         </button>
 
-
         {expanded && (
-
           <div className="source-content">
-
             {source.text}
-
           </div>
-
         )}
 
       </div>
-
     );
   };
 
@@ -246,7 +234,6 @@ function App() {
   // ==========================================================
 
   return (
-
     <div className="app">
 
       {/* ====================================================
@@ -275,7 +262,6 @@ function App() {
 
         </div>
 
-
         <div className="system-status">
 
           <span className="status-dot"></span>
@@ -293,7 +279,6 @@ function App() {
 
       <div className="workspace">
 
-
         {/* ==================================================
             SIDEBAR
         ================================================== */}
@@ -303,7 +288,6 @@ function App() {
           <div className="sidebar-title">
             DOCUMENT
           </div>
-
 
           {document ? (
 
@@ -347,7 +331,6 @@ function App() {
 
           )}
 
-
           <button
             className="upload-sidebar-button"
             onClick={openFileSelector}
@@ -365,7 +348,6 @@ function App() {
 
           </button>
 
-
           <input
             ref={fileInputRef}
             type="file"
@@ -373,7 +355,6 @@ function App() {
             onChange={uploadDocument}
             style={{ display: "none" }}
           />
-
 
           <div className="sidebar-info">
 
@@ -395,9 +376,6 @@ function App() {
         ================================================== */}
 
         <main className="chat-area">
-
-
-          {/* CHAT HEADER */}
 
           <div className="chat-header">
 
@@ -439,7 +417,6 @@ function App() {
                   Upload a document to start
                   exploring its contents with AI.
                 </p>
-
 
                 <div className="suggestions">
 
@@ -502,7 +479,6 @@ function App() {
 
                       </div>
 
-
                       <div className="message-body">
 
                         <div className="message-author">
@@ -513,15 +489,9 @@ function App() {
 
                         </div>
 
-
                         <div className="message-text">
-
                           {message.content}
-
                         </div>
-
-
-                        {/* SOURCES */}
 
                         {message.role === "assistant" &&
                           message.sources &&
@@ -554,7 +524,6 @@ function App() {
 
                   )
                 )}
-
 
                 {loading && (
 
@@ -606,7 +575,6 @@ function App() {
                 +
               </button>
 
-
               <input
                 type="text"
                 value={question}
@@ -624,7 +592,6 @@ function App() {
                 }
               />
 
-
               <button
                 className="send-button"
                 onClick={askQuestion}
@@ -634,13 +601,10 @@ function App() {
                   !question.trim()
                 }
               >
-
                 →
-
               </button>
 
             </div>
-
 
             <div className="input-hint">
               Press Enter to send
@@ -653,7 +617,6 @@ function App() {
       </div>
 
     </div>
-
   );
 }
 
