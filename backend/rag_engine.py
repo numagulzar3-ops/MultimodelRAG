@@ -1,15 +1,15 @@
+
 import os
 
 import faiss
 import numpy as np
 
-from sentence_transformers import SentenceTransformer
+from google import genai
+from google.genai import types
 
 from unstructured.partition.docx import partition_docx
 from unstructured.partition.pdf import partition_pdf
 from unstructured.chunking.title import chunk_by_title
-
-from google import genai
 
 
 # ============================================================
@@ -29,36 +29,46 @@ client = genai.Client(
 
 
 # ============================================================
-# 2. EMBEDDING MODEL
-# ============================================================
-
-model = None
-
-
-def get_embedding_model():
-
-    global model
-
-    if model is None:
-
-        print("\nLoading embedding model...")
-
-        model = SentenceTransformer(
-            "all-MiniLM-L6-v2"
-        )
-
-        print("Embedding model loaded.")
-
-    return model
-
-
-# ============================================================
-# 3. GLOBAL RAG STATE
+# 2. GLOBAL RAG STATE
 # ============================================================
 
 texts = []
 index = None
 chat_history = []
+
+
+# ============================================================
+# 3. GEMINI EMBEDDINGS
+# ============================================================
+
+EMBEDDING_MODEL = "gemini-embedding-001"
+
+
+def create_embeddings(text_list):
+
+    if not text_list:
+        return np.array(
+            [],
+            dtype="float32"
+        )
+
+    response = client.models.embed_content(
+        model=EMBEDDING_MODEL,
+        contents=text_list,
+        config=types.EmbedContentConfig(
+            output_dimensionality=768
+        )
+    )
+
+    embeddings = [
+        embedding.values
+        for embedding in response.embeddings
+    ]
+
+    return np.array(
+        embeddings,
+        dtype="float32"
+    )
 
 
 # ============================================================
@@ -125,22 +135,12 @@ def process_document(file_path):
         )
 
     # --------------------------------------------------------
-    # Load embedding model ONLY when needed
+    # Create Gemini embeddings
     # --------------------------------------------------------
 
-    embedding_model = get_embedding_model()
-
-    # --------------------------------------------------------
-    # Create embeddings
-    # --------------------------------------------------------
-
-    embeddings = embedding_model.encode(
+    embeddings = create_embeddings(
         texts
     )
-
-    embeddings = np.array(
-        embeddings
-    ).astype("float32")
 
     print(
         "Embedding shape:",
@@ -190,12 +190,6 @@ def answer_question(query):
             "answer": "Please upload a document before asking a question.",
             "sources": []
         }
-
-    # --------------------------------------------------------
-    # Get embedding model
-    # --------------------------------------------------------
-
-    embedding_model = get_embedding_model()
 
     # ========================================================
     # CREATE HISTORY TEXT
@@ -259,20 +253,16 @@ Rewritten search query:
     # EMBED SEARCH QUERY
     # ========================================================
 
-    query_embedding = embedding_model.encode(
+    query_embeddings = create_embeddings(
         [search_query]
     )
-
-    query_embedding = np.array(
-        query_embedding
-    ).astype("float32")
 
     # ========================================================
     # FAISS SEARCH
     # ========================================================
 
     distances, indices = index.search(
-        query_embedding,
+        query_embeddings,
         min(3, index.ntotal)
     )
 
@@ -363,3 +353,4 @@ Answer:
             if idx >= 0
         ]
     }
+
